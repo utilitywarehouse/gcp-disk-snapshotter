@@ -3,7 +3,7 @@ package snapshot
 import (
 	"context"
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
 	"time"
@@ -46,12 +46,12 @@ func CreateGCPSnapClient(project, snapPrefix string, zones []string, labels mode
 	ctx := context.Background()
 	googleClient, err := google.DefaultClient(ctx, compute.ComputeScope)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to create google client:", err)
 	}
 
 	computeService, err := compute.New(googleClient)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to create compute service:", err)
 	}
 
 	return &GCPSnapClient{

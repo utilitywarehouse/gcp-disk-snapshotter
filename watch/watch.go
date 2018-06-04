@@ -1,6 +1,7 @@
 package watch
 
 import (
+	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -11,16 +12,18 @@ import (
 // From https://golang.org/src/time/format.go
 const GCPSnapshotTimestampLayout string = "2006-01-02T15:04:05Z07:00"
 
-func Watch(gsc *snapshot.GCPSnapClient, retentionHours, intervalSecs int) {
+func Watch(gsc *snapshot.GCPSnapClient, watchInterval, retentionHours, intervalSecs int) {
 
 	for t := time.Tick(time.Second * 60); ; <-t {
 
 		retentionStart := time.Now().Add(-time.Duration(retentionHours) * time.Hour)
 		lastAcceptedCreation := time.Now().Add(time.Duration(-intervalSecs) * time.Second)
+
 		log.WithFields(log.Fields{
-			"Retention Start":         retentionStart,
+			"Watch Interval in secs":  watchInterval,
+			"Retention Period Start":  retentionStart,
 			"last accepted snap time": lastAcceptedCreation,
-		}).Info("Initiating watch cycle")
+		}).Info("Initiating new disk watch cycle")
 
 		// Get disks
 		disks, err := gsc.GetDiskList()
@@ -30,7 +33,7 @@ func Watch(gsc *snapshot.GCPSnapClient, retentionHours, intervalSecs int) {
 		}
 
 		for _, disk := range disks {
-			log.Info("Checking disk: ", disk.Name)
+			log.Debug("Checking disk: ", disk.Name)
 
 			// Get snapshots per disk created by the snapshotter
 			snaps, err := gsc.ListClientCreatedSnapshots(disk.SelfLink)
@@ -93,11 +96,12 @@ func deleteSnapshots(gsc *snapshot.GCPSnapClient, sl []compute.Snapshot) error {
 }
 
 func createSnapshot(gsc *snapshot.GCPSnapClient, d compute.Disk) error {
-	log.Info("Taking snapshot of disk: ", d.Name)
+	log.Debug("Attempt to take snapshot of disk: ", d.Name)
 	op, err := gsc.CreateSnapshot(d.Name, d.Zone)
 	if err != nil {
 		return err
 	}
+	log.Info(fmt.Sprintf("New snapshot of disk: %v operation: %v", d.Name, op))
 
 	// Create snapshot is a zonal operation!!!
 	go pollZonalOperation(gsc, op, d.Zone)
@@ -109,8 +113,7 @@ func pollZonalOperation(gsc *snapshot.GCPSnapClient, operation, zone string) {
 	for {
 		status, err := gsc.GetZonalOperationStatus(operation, zone)
 		if err != nil {
-			log.Info("Operation failed: ", operation)
-			log.Error(err)
+			log.Error("Operation failed: ", operation, err)
 			break
 		}
 		if status == "DONE" {
@@ -125,8 +128,7 @@ func pollGlobalOperation(gsc *snapshot.GCPSnapClient, operation string) {
 	for {
 		status, err := gsc.GetGlobalOperationStatus(operation)
 		if err != nil {
-			log.Info("Operation failed: ", operation)
-			log.Error(err)
+			log.Error("Operation failed: ", operation, err)
 			break
 		}
 		if status == "DONE" {

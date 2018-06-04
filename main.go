@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/utilitywarehouse/gcp-disk-snapshotter/models"
 	"github.com/utilitywarehouse/gcp-disk-snapshotter/snapshot"
 	"github.com/utilitywarehouse/gcp-disk-snapshotter/watch"
@@ -16,13 +17,27 @@ var (
 	flagZones           = flag.String("zones", "", "(Required) Comma separated list of zones where projects disks may live")
 	flagLabels          = flag.String("labels", "", "(Required) Comma separated list of disk labels in format <name>:<value>")
 	flagSnapPrefix      = flag.String("snap_prefix", "", "Prefix for created snapshots")
+	flagWatchInterval   = flag.Int("watch_interval", 60, "Interval between watch cycles in seconds. Defaults to 60s")
 	flagRetentionHours  = flag.Int("retention_hours", 720, "Retention Duration in hours. Defaults to 720h = 1 month")
 	flagIntervalSeconds = flag.Int("interval_secs", 43200, "Interval between snapshots in seconds. Defaults to 43200s = 12h")
+	flagLogLevel        = flag.String("log_level", "info", "Log Level, defaults to INFO")
 )
 
 func usage() {
 	flag.Usage()
 	os.Exit(2)
+}
+
+func initLogging(logLevel string) {
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+
+	level, err := log.ParseLevel(logLevel)
+	if err != nil {
+		log.Fatal("error parsing log level: %v", err)
+	}
+	log.SetLevel(level)
 }
 
 func main() {
@@ -57,13 +72,18 @@ func main() {
 	}
 
 	snapPrefix := *flagSnapPrefix
+	watchInterval := *flagWatchInterval
 	retentionHours := *flagRetentionHours
 	intervalSecs := *flagIntervalSeconds
+	logLevel := *flagLogLevel
+
+	// Init logging
+	initLogging(logLevel)
 
 	// Create a snapshotter
 	gsc := snapshot.CreateGCPSnapClient(project, snapPrefix, zones, *labels)
 
 	// Start watching
-	watch.Watch(gsc, retentionHours, intervalSecs)
+	watch.Watch(gsc, watchInterval, retentionHours, intervalSecs)
 
 }
