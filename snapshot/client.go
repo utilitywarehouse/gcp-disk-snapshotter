@@ -63,7 +63,6 @@ func CreateGCPSnapClient(project, snapPrefix string, zones []string, labels mode
 	}
 }
 
-// Helper function
 // In case of a gcp link it returns the target (final part after /)
 func formatLinkString(in string) string {
 
@@ -187,6 +186,21 @@ func (gsc *GCPSnapClient) DeleteSnapshot(snapName string) (string, error) {
 	return resp.SelfLink, nil
 }
 
+func parseOperationOut(operation *compute.Operation) (string, error) {
+
+	// Get status (Possible values: "DONE", "PENDING", "RUNNING") and errors
+	status := operation.Status
+	if operation.Error != nil {
+		var err_msgs []string
+		for _, err := range operation.Error.Errors {
+			err_msgs = append(err_msgs, err.Message)
+		}
+		return status, errors.New(strings.Join(err_msgs, ","))
+	}
+	return status, nil
+
+}
+
 func (gsc *GCPSnapClient) GetZonalOperationStatus(operation, zone string) (string, error) {
 
 	// Format in case of link
@@ -198,16 +212,7 @@ func (gsc *GCPSnapClient) GetZonalOperationStatus(operation, zone string) (strin
 		return "", errors.Wrap(err, "error getting zonal operation:")
 	}
 
-	// Get status (Possible values: "DONE", "PENDING", "RUNNING") and errors
-	status := op.Status
-	if op.Error != nil {
-		var err_msgs []string
-		for _, err := range op.Error.Errors {
-			err_msgs = append(err_msgs, err.Message)
-		}
-		return status, errors.New(strings.Join(err_msgs, ","))
-	}
-	return status, nil
+	return parseOperationOut(op)
 }
 
 func (gsc *GCPSnapClient) GetGlobalOperationStatus(operation string) (string, error) {
@@ -220,14 +225,5 @@ func (gsc *GCPSnapClient) GetGlobalOperationStatus(operation string) (string, er
 		return "", errors.Wrap(err, "error getting global operation:")
 	}
 
-	// Get status (Possible values: "DONE", "PENDING", "RUNNING") and errors
-	status := op.Status
-	if op.Error != nil {
-		var err_msgs []string
-		for _, err := range op.Error.Errors {
-			err_msgs = append(err_msgs, err.Message)
-		}
-		return status, errors.New(strings.Join(err_msgs, ","))
-	}
-	return status, nil
+	return parseOperationOut(op)
 }
