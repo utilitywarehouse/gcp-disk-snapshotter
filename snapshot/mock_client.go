@@ -73,16 +73,16 @@ func (mr *MockGCPSnapClientInterfaceMockRecorder) ListClientCreatedSnapshots(dis
 }
 
 // CreateSnapshot mocks base method
-func (m *MockGCPSnapClientInterface) CreateSnapshot() (string, error) {
-	ret := m.ctrl.Call(m, "CreateSnapshot")
+func (m *MockGCPSnapClientInterface) CreateSnapshot(diskName, zone string) (string, error) {
+	ret := m.ctrl.Call(m, "CreateSnapshot", diskName, zone)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateSnapshot indicates an expected call of CreateSnapshot
-func (mr *MockGCPSnapClientInterfaceMockRecorder) CreateSnapshot() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSnapshot", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).CreateSnapshot))
+func (mr *MockGCPSnapClientInterfaceMockRecorder) CreateSnapshot(diskName, zone interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSnapshot", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).CreateSnapshot), diskName, zone)
 }
 
 // DeleteSnapshot mocks base method
