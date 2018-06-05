@@ -84,6 +84,12 @@ func main() {
 	gsc := snapshot.CreateGCPSnapClient(project, snapPrefix, zones, *labels)
 
 	// Start watching
-	watch.Watch(gsc, watchInterval, retentionHours, intervalSecs)
+	watcher := &watch.Watcher{
+		GSC:            gsc,
+		WatchInterval:  watchInterval,
+		RetentionHours: retentionHours,
+		IntervalSecs:   intervalSecs,
+	}
+	watcher.Watch()
 
 }

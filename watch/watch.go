@@ -12,21 +12,34 @@ import (
 // From https://golang.org/src/time/format.go
 const GCPSnapshotTimestampLayout string = "2006-01-02T15:04:05Z07:00"
 
-func Watch(gsc *snapshot.GCPSnapClient, watchInterval, retentionHours, intervalSecs int) {
+type Watcher struct {
+	GSC            snapshot.GCPSnapClientInterface
+	WatchInterval  int
+	RetentionHours int
+	IntervalSecs   int
+}
 
-	for t := time.Tick(time.Second * 60); ; <-t {
+type WatcherInterface interface {
+	Watch()
+	deleteSnapshots(sl []compute.Snapshot)
+	createSnapshot(d compute.Disk)
+	pollZonalOperation(operation, zone string)
+}
 
-		retentionStart := time.Now().Add(-time.Duration(retentionHours) * time.Hour)
-		lastAcceptedCreation := time.Now().Add(time.Duration(-intervalSecs) * time.Second)
+func (w *Watcher) Watch() {
+
+	for t := time.Tick(time.Second * time.Duration(w.IntervalSecs)); ; <-t {
+		retentionStart := time.Now().Add(-time.Duration(w.RetentionHours) * time.Hour)
+		lastAcceptedCreation := time.Now().Add(time.Duration(-w.IntervalSecs) * time.Second)
 
 		log.WithFields(log.Fields{
-			"Watch Interval in secs":  watchInterval,
+			"Watch Interval in secs":  w.WatchInterval,
 			"Retention Period Start":  retentionStart,
 			"last accepted snap time": lastAcceptedCreation,
 		}).Info("Initiating new disk watch cycle")
 
 		// Get disks
-		disks, err := gsc.GetDiskList()
+		disks, err := w.GSC.GetDiskList()
 		if err != nil {
 			log.Error(err)
 			continue
@@ -36,7 +49,7 @@ func Watch(gsc *snapshot.GCPSnapClient, watchInterval, retentionHours, intervalS
 			log.Debug("Checking disk: ", disk.Name)
 
 			// Get snapshots per disk created by the snapshotter
-			snaps, err := gsc.ListClientCreatedSnapshots(disk.SelfLink)
+			snaps, err := w.GSC.ListClientCreatedSnapshots(disk.SelfLink)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -65,53 +78,54 @@ func Watch(gsc *snapshot.GCPSnapClient, watchInterval, retentionHours, intervalS
 			}
 
 			// Delete old snaps
-			if err := deleteSnapshots(gsc, snapsToDelete); err != nil {
+			if err := w.deleteSnapshots(snapsToDelete); err != nil {
 				log.Error(err)
 			}
 
 			// Take snapshot if needed
 			if snapNeeded {
-				if err := createSnapshot(gsc, disk); err != nil {
+				if err := w.createSnapshot(disk); err != nil {
 					log.Error(err)
 				}
 			}
 
 		}
+
 	}
 }
 
-func deleteSnapshots(gsc *snapshot.GCPSnapClient, sl []compute.Snapshot) error {
+func (w *Watcher) deleteSnapshots(sl []compute.Snapshot) error {
 	for _, s := range sl {
 		log.Info("Attempting to delete snapshot: ", s.Name)
-		op, err := gsc.DeleteSnapshot(s.Name)
+		op, err := w.GSC.DeleteSnapshot(s.Name)
 		if err != nil {
 			return err
 		}
 
 		// Delete snapshot is a global operation!!!
-		go pollGlobalOperation(gsc, op)
+		go w.pollGlobalOperation(op)
 
 	}
 	return nil
 }
 
-func createSnapshot(gsc *snapshot.GCPSnapClient, d compute.Disk) error {
+func (w *Watcher) createSnapshot(d compute.Disk) error {
 	log.Debug("Attempt to take snapshot of disk: ", d.Name)
-	op, err := gsc.CreateSnapshot(d.Name, d.Zone)
+	op, err := w.GSC.CreateSnapshot(d.Name, d.Zone)
 	if err != nil {
 		return err
 	}
 	log.Info(fmt.Sprintf("New snapshot of disk: %v operation: %v", d.Name, op))
 
 	// Create snapshot is a zonal operation!!!
-	go pollZonalOperation(gsc, op, d.Zone)
+	go w.pollZonalOperation(op, d.Zone)
 
 	return nil
 }
 
-func pollZonalOperation(gsc *snapshot.GCPSnapClient, operation, zone string) {
+func (w *Watcher) pollZonalOperation(operation, zone string) {
 	for {
-		status, err := gsc.GetZonalOperationStatus(operation, zone)
+		status, err := w.GSC.GetZonalOperationStatus(operation, zone)
 		if err != nil {
 			log.Error("Operation failed: ", operation, err)
 			break
@@ -124,9 +138,9 @@ func pollZonalOperation(gsc *snapshot.GCPSnapClient, operation, zone string) {
 	}
 }
 
-func pollGlobalOperation(gsc *snapshot.GCPSnapClient, operation string) {
+func (w *Watcher) pollGlobalOperation(operation string) {
 	for {
-		status, err := gsc.GetGlobalOperationStatus(operation)
+		status, err := w.GSC.GetGlobalOperationStatus(operation)
 		if err != nil {
 			log.Error("Operation failed: ", operation, err)
 			break

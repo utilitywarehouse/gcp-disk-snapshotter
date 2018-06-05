@@ -34,7 +34,7 @@ type GCPSnapClientInterface interface {
 	GetDiskList() ([]compute.Disk, error)
 	ListSnapshots(diskSelfLink string) ([]compute.Snapshot, error)
 	ListClientCreatedSnapshots(diskSelfLink string) ([]compute.Snapshot, error)
-	CreateSnapshot() (string, error)
+	CreateSnapshot(diskName, zone string) (string, error)
 	DeleteSnapshot(snapName string) (string, error)
 	GetZonalOperationStatus(operation, zone string) (string, error)
 	GetGlobalOperationStatus(operation string) (string, error)
