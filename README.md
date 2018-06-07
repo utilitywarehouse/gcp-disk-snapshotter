@@ -20,7 +20,7 @@ Usage of /gcp-disk-snapshotter:
         (Required) Comma separated list of zones where projects disks may live
 ```
 
-#Configuration File
+## Configuration File
 
 Example Configuration File:
 

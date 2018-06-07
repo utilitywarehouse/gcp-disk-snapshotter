@@ -185,9 +185,13 @@ func (gsc *GCPSnapClient) CreateSnapshot(diskName, zone string) (string, error) 
 	}
 
 	// Name must match regex '(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'
+	// Note: kubernetes creates pvs with names like: kubernetes-dynamic-pvc-828cdc8a-4f85-11e8-a7bc-42010a16140a
+	// that are 60 chars and so snapshots exceed the 63 chars long with the added suffix.
+	// Let's just trim `kubernetes-dynamic-` from the name
+	name := strings.TrimPrefix(diskName, "kubernetes-dynamic-")
 	snapshot := &compute.Snapshot{
 		Description: fmt.Sprintf("Snapshot of %s", diskName),
-		Name:        fmt.Sprintf("%s%s-%s", gsc.SnapPrefix, diskName, time.Now().Format("20060102150405")),
+		Name:        fmt.Sprintf("%s%s-%s", gsc.SnapPrefix, name, time.Now().Format("20060102150405")),
 		Labels:      snapLabels,
 	}
 
