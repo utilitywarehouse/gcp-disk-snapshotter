@@ -6,6 +6,7 @@ package snapshot
 
 import (
 	gomock "github.com/golang/mock/gomock"
+	models "github.com/utilitywarehouse/gcp-disk-snapshotter/models"
 	v1 "google.golang.org/api/compute/v1"
 	reflect "reflect"
 )
@@ -33,17 +34,30 @@ func (m *MockGCPSnapClientInterface) EXPECT() *MockGCPSnapClientInterfaceMockRec
 	return m.recorder
 }
 
-// GetDiskList mocks base method
-func (m *MockGCPSnapClientInterface) GetDiskList() ([]v1.Disk, error) {
-	ret := m.ctrl.Call(m, "GetDiskList")
+// GetDisksFromLabel mocks base method
+func (m *MockGCPSnapClientInterface) GetDisksFromLabel(label *models.Label) ([]v1.Disk, error) {
+	ret := m.ctrl.Call(m, "GetDisksFromLabel", label)
 	ret0, _ := ret[0].([]v1.Disk)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetDiskList indicates an expected call of GetDiskList
-func (mr *MockGCPSnapClientInterfaceMockRecorder) GetDiskList() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDiskList", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).GetDiskList))
+// GetDisksFromLabel indicates an expected call of GetDisksFromLabel
+func (mr *MockGCPSnapClientInterfaceMockRecorder) GetDisksFromLabel(label interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDisksFromLabel", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).GetDisksFromLabel), label)
+}
+
+// GetDisksFromDescription mocks base method
+func (m *MockGCPSnapClientInterface) GetDisksFromDescription(label *models.Description) ([]v1.Disk, error) {
+	ret := m.ctrl.Call(m, "GetDisksFromDescription", label)
+	ret0, _ := ret[0].([]v1.Disk)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDisksFromDescription indicates an expected call of GetDisksFromDescription
+func (mr *MockGCPSnapClientInterfaceMockRecorder) GetDisksFromDescription(label interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDisksFromDescription", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).GetDisksFromDescription), label)
 }
 
 // ListSnapshots mocks base method

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/utilitywarehouse/gcp-disk-snapshotter/models"
 	"github.com/utilitywarehouse/gcp-disk-snapshotter/snapshot"
 	compute "google.golang.org/api/compute/v1"
 )
@@ -13,82 +14,94 @@ import (
 const GCPSnapshotTimestampLayout string = "2006-01-02T15:04:05Z07:00"
 
 type Watcher struct {
-	GSC            snapshot.GCPSnapClientInterface
-	WatchInterval  int
-	RetentionHours int
-	IntervalSecs   int
+	GSC           snapshot.GCPSnapClientInterface
+	WatchInterval int
 }
 
 type WatcherInterface interface {
-	Watch()
+	Watch(sc *models.SnapshotConfigs)
+	CheckAndSnapDisks(disks []compute.Disk, retentionStart, lastAcceptedCreation int)
 	deleteSnapshots(sl []compute.Snapshot)
 	createSnapshot(d compute.Disk)
 	pollZonalOperation(operation, zone string)
 }
 
-func (w *Watcher) Watch() {
+func (w *Watcher) Watch(sc *models.SnapshotConfigs) {
 
-	for t := time.Tick(time.Second * time.Duration(w.IntervalSecs)); ; <-t {
-		retentionStart := time.Now().Add(-time.Duration(w.RetentionHours) * time.Hour)
-		lastAcceptedCreation := time.Now().Add(time.Duration(-w.IntervalSecs) * time.Second)
+	for t := time.Tick(time.Second * time.Duration(w.WatchInterval)); ; <-t {
 
-		log.WithFields(log.Fields{
-			"Watch Interval in secs":  w.WatchInterval,
-			"Retention Period Start":  retentionStart,
-			"last accepted snap time": lastAcceptedCreation,
-		}).Info("Initiating new disk watch cycle")
+		// Check Labels
+		for _, lConfig := range sc.Labels {
+			retentionStart := time.Now().Add(-time.Duration(lConfig.RetentionPeriodHours) * time.Hour)
+			lastAcceptedCreation := time.Now().Add(time.Duration(-lConfig.IntervalSeconds) * time.Second)
 
-		// Get disks
-		disks, err := w.GSC.GetDiskList()
+			// Get disks
+			disks, err := w.GSC.GetDisksFromLabel(lConfig.Label)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			w.CheckAndSnapDisks(disks, retentionStart, lastAcceptedCreation)
+		}
+		// Check Descriptions
+		for _, dConfig := range sc.Descriptions {
+			retentionStart := time.Now().Add(-time.Duration(dConfig.RetentionPeriodHours) * time.Hour)
+			lastAcceptedCreation := time.Now().Add(time.Duration(-dConfig.IntervalSeconds) * time.Second)
+
+			// Get disks
+			disks, err := w.GSC.GetDisksFromDescription(dConfig.Description)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			w.CheckAndSnapDisks(disks, retentionStart, lastAcceptedCreation)
+		}
+	}
+}
+
+func (w *Watcher) CheckAndSnapDisks(disks []compute.Disk, retentionStart, lastAcceptedCreation time.Time) {
+	for _, disk := range disks {
+		log.Debug("Checking disk: ", disk.Name)
+
+		// Get snapshots per disk created by the snapshotter
+		snaps, err := w.GSC.ListClientCreatedSnapshots(disk.SelfLink)
 		if err != nil {
-			log.Error(err)
-			continue
+			log.Fatal(err)
 		}
 
-		for _, disk := range disks {
-			log.Debug("Checking disk: ", disk.Name)
+		// Initialise values for delete list and snapshot flag
+		snapsToDelete := []compute.Snapshot{}
+		snapNeeded := true
 
-			// Get snapshots per disk created by the snapshotter
-			snaps, err := w.GSC.ListClientCreatedSnapshots(disk.SelfLink)
+		// Check timestamps of all snapshots to update the above vars
+		for _, snap := range snaps {
+			snapTime, err := time.Parse(GCPSnapshotTimestampLayout, snap.CreationTimestamp)
 			if err != nil {
-				log.Fatal(err)
+				log.Error("failed to parse timestamp:", err)
+				continue
 			}
 
-			// Initialise values for delete list and snapshot flag
-			snapsToDelete := []compute.Snapshot{}
-			snapNeeded := true
-
-			// Check timestamps of all snapshots to update the above vars
-			for _, snap := range snaps {
-				snapTime, err := time.Parse(GCPSnapshotTimestampLayout, snap.CreationTimestamp)
-				if err != nil {
-					log.Error("failed to parse timestamp:", err)
-					continue
-				}
-
-				// If created before retention start time we need to delete
-				if snapTime.Before(retentionStart) {
-					snapsToDelete = append(snapsToDelete, snap)
-				}
-
-				// If a snap was taken after last accepted creation time we do not need a new one
-				if snapTime.After(lastAcceptedCreation) {
-					snapNeeded = false
-				}
+			// If created before retention start time we need to delete
+			if snapTime.Before(retentionStart) {
+				snapsToDelete = append(snapsToDelete, snap)
 			}
 
-			// Delete old snaps
-			if err := w.deleteSnapshots(snapsToDelete); err != nil {
+			// If a snap was taken after last accepted creation time we do not need a new one
+			if snapTime.After(lastAcceptedCreation) {
+				snapNeeded = false
+			}
+		}
+
+		// Delete old snaps
+		if err := w.deleteSnapshots(snapsToDelete); err != nil {
+			log.Error(err)
+		}
+
+		// Take snapshot if needed
+		if snapNeeded {
+			if err := w.createSnapshot(disk); err != nil {
 				log.Error(err)
 			}
-
-			// Take snapshot if needed
-			if snapNeeded {
-				if err := w.createSnapshot(disk); err != nil {
-					log.Error(err)
-				}
-			}
-
 		}
 
 	}

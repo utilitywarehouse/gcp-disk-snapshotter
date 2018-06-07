@@ -2,6 +2,7 @@ package snapshot
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net/http"
@@ -25,13 +26,13 @@ var googleClient *http.Client
 type GCPSnapClient struct {
 	Project        string
 	Zones          []string
-	Labels         models.LabelList
 	SnapPrefix     string
 	ComputeService compute.Service
 }
 
 type GCPSnapClientInterface interface {
-	GetDiskList() ([]compute.Disk, error)
+	GetDisksFromLabel(label *models.Label) ([]compute.Disk, error)
+	GetDisksFromDescription(label *models.Description) ([]compute.Disk, error)
 	ListSnapshots(diskSelfLink string) ([]compute.Snapshot, error)
 	ListClientCreatedSnapshots(diskSelfLink string) ([]compute.Snapshot, error)
 	CreateSnapshot(diskName, zone string) (string, error)
@@ -41,7 +42,7 @@ type GCPSnapClientInterface interface {
 }
 
 // Basic Init function for the snapshotter
-func CreateGCPSnapClient(project, snapPrefix string, zones []string, labels models.LabelList) *GCPSnapClient {
+func CreateGCPSnapClient(project, snapPrefix string, zones []string) *GCPSnapClient {
 
 	ctx := context.Background()
 	googleClient, err := google.DefaultClient(ctx, compute.ComputeScope)
@@ -57,7 +58,6 @@ func CreateGCPSnapClient(project, snapPrefix string, zones []string, labels mode
 	return &GCPSnapClient{
 		Project:        project,
 		Zones:          zones,
-		Labels:         labels,
 		SnapPrefix:     snapPrefix,
 		ComputeService: *computeService,
 	}
@@ -74,7 +74,7 @@ func formatLinkString(in string) string {
 }
 
 // GetDiskList: Returns a list of disks that contain one of the given labels
-func (gsc *GCPSnapClient) GetDiskList() ([]compute.Disk, error) {
+func (gsc *GCPSnapClient) GetDisksFromLabel(label *models.Label) ([]compute.Disk, error) {
 
 	disks := []compute.Disk{}
 
@@ -85,12 +85,36 @@ func (gsc *GCPSnapClient) GetDiskList() ([]compute.Disk, error) {
 		}
 
 		for _, disk := range resp.Items {
-			for _, label := range gsc.Labels.Items {
-				if val, ok := disk.Labels[label.Name]; ok {
-					if label.Value == val {
-						disks = append(disks, *disk)
-						break
-					}
+			if val, ok := disk.Labels[label.Key]; ok {
+				if label.Value == val {
+					disks = append(disks, *disk)
+				}
+			}
+		}
+	}
+
+	return disks, nil
+}
+
+func (gsc *GCPSnapClient) GetDisksFromDescription(desc *models.Description) ([]compute.Disk, error) {
+
+	disks := []compute.Disk{}
+
+	for _, zone := range gsc.Zones {
+		resp, err := gsc.ComputeService.Disks.List(gsc.Project, zone).Do()
+		if err != nil {
+			return disks, errors.Wrap(err, "error listing disks")
+		}
+
+		for _, disk := range resp.Items {
+			var dObj map[string]string
+			if err = json.Unmarshal([]byte(disk.Description), &dObj); err != nil {
+				log.Debug("Skipping: error unmarshalling disk description to map: ", err)
+				continue
+			}
+			if val, ok := dObj[desc.Key]; ok {
+				if desc.Value == val {
+					disks = append(disks, *disk)
 				}
 			}
 		}
@@ -163,7 +187,7 @@ func (gsc *GCPSnapClient) CreateSnapshot(diskName, zone string) (string, error) 
 	// Name must match regex '(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'
 	snapshot := &compute.Snapshot{
 		Description: fmt.Sprintf("Snapshot of %s", diskName),
-		Name:        fmt.Sprintf("%s%s-snapshot-%s", gsc.SnapPrefix, diskName, time.Now().Format("20060102150405")),
+		Name:        fmt.Sprintf("%s%s-%s", gsc.SnapPrefix, diskName, time.Now().Format("20060102150405")),
 		Labels:      snapLabels,
 	}
 
