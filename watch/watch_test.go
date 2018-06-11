@@ -6,6 +6,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/utilitywarehouse/gcp-disk-snapshotter/metrics"
 	"github.com/utilitywarehouse/gcp-disk-snapshotter/snapshot"
 	compute "google.golang.org/api/compute/v1"
 )
@@ -17,8 +18,11 @@ func TestCreateSnapshot(t *testing.T) {
 
 	// Watcher with mocked GCPSnapClient interface
 	mgsc := snapshot.NewMockGCPSnapClientInterface(mockCtrl)
+	metrics := metrics.NewMockPrometheusInterface(mockCtrl)
+
 	watcher := &Watcher{
-		GSC: mgsc,
+		GSC:     mgsc,
+		Metrics: metrics,
 	}
 
 	// test compute disk
@@ -33,6 +37,7 @@ func TestCreateSnapshot(t *testing.T) {
 	gomock.InOrder(
 		expectCreateSnapshotAndReturnSuccessfully(mgsc, d.Name, d.Zone),
 		expectGetZonalOperationStatusAndWriteToChannel(mgsc, "op", d.Zone, op_res),
+		expectUpdateOperationStatus(metrics, "zonal", true),
 	)
 	err := watcher.createSnapshot(d)
 	if err != nil {
@@ -42,9 +47,9 @@ func TestCreateSnapshot(t *testing.T) {
 
 	// Error Run
 	testErr := errors.New("test error")
-	//gomock.InOrder(
+
 	expectCreateSnapshotAndReturnError(mgsc, d.Name, d.Zone, testErr)
-	//)
+
 	err = watcher.createSnapshot(d)
 	if err == nil {
 		t.Fatal("No error returned!")
@@ -53,77 +58,48 @@ func TestCreateSnapshot(t *testing.T) {
 
 }
 
-func TestDeleteSnapshots(t *testing.T) {
+func TestDeleteSnapshot(t *testing.T) {
 
 	mockCtrl := gomock.NewController(t)
+	metrics := metrics.NewMockPrometheusInterface(mockCtrl)
 
 	// Watcher with mocked GCPSnapClient interface
 	mgsc := snapshot.NewMockGCPSnapClientInterface(mockCtrl)
 	watcher := &Watcher{
-		GSC: mgsc,
+		GSC:     mgsc,
+		Metrics: metrics,
 	}
 
 	// Channel used to wait for operation polling
 	op_res := make(chan bool)
 
-	// Empty List
-	sl := []compute.Snapshot{}
-	err := watcher.deleteSnapshots(sl)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Add a test snapshot to the list
+	// Create a test snapshot to delete
 	s := compute.Snapshot{
 		Name: "test1",
 	}
-	sl = append(sl, s)
 
 	gomock.InOrder(
-		expectDeleteSnapshotAndReturnSuccessfully(mgsc, sl[0].Name),
+		expectDeleteSnapshotAndReturnSuccessfully(mgsc, s.Name),
 		expectGetGlobalOperationStatusAndWriteToChannel(mgsc, "op", op_res),
+		expectUpdateOperationStatus(metrics, "global", true),
 	)
-	err = watcher.deleteSnapshots(sl)
+	err := watcher.deleteSnapshot(s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForOp(op_res)
-
-	// test multiple
-	s = compute.Snapshot{
-		Name: "test2",
-	}
-	sl = append(sl, s)
-
-	// We cannot expect calls to keep order on multiple snapshots deletion
-	expectDeleteSnapshotAndReturnSuccessfully(mgsc, sl[0].Name)
-	expectDeleteSnapshotAndReturnSuccessfully(mgsc, sl[1].Name)
-	expectGetGlobalOperationStatusAndWriteToChannel(mgsc, "op", op_res)
-	expectGetGlobalOperationStatusAndWriteToChannel(mgsc, "op", op_res)
-
-	err = watcher.deleteSnapshots(sl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	waitForOp(op_res)
 	waitForOp(op_res)
 
 	// Error Run
 	testErr := errors.New("test error")
-	// We cannot expect calls to keep order on multiple snapshots deletion
-	expectDeleteSnapshotAndReturnSuccessfully(mgsc, sl[0].Name)
-	expectDeleteSnapshotAndReturnError(mgsc, sl[1].Name, testErr)
-	expectGetGlobalOperationStatusAndWriteToChannel(mgsc, "op", op_res)
-	expectGetGlobalOperationStatusAndWriteToChannel(mgsc, "op", op_res)
 
-	err = watcher.deleteSnapshots(sl)
+	expectDeleteSnapshotAndReturnError(mgsc, s.Name, testErr)
+
+	err = watcher.deleteSnapshot(s)
 	if err == nil {
 		t.Fatal("No error returned!")
 	}
 	assert.EqualError(t, err, "test error")
 
-	// Wait for 1 operation since the other call fails
-	waitForOp(op_res)
 }
 
 func waitForOp(op_res chan bool) {
@@ -163,4 +139,8 @@ func expectGetGlobalOperationStatusAndWriteToChannel(gsc *snapshot.MockGCPSnapCl
 			op_ch <- true
 		},
 	).Return("DONE", nil)
+}
+
+func expectUpdateOperationStatus(m *metrics.MockPrometheusInterface, operation_type string, success bool) *gomock.Call {
+	return m.EXPECT().UpdateOperationStatus(operation_type, success).Times(1).Return()
 }

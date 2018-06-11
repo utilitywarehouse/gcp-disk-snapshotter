@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/utilitywarehouse/gcp-disk-snapshotter/metrics"
 	"github.com/utilitywarehouse/gcp-disk-snapshotter/models"
 	"github.com/utilitywarehouse/gcp-disk-snapshotter/snapshot"
 	"github.com/utilitywarehouse/gcp-disk-snapshotter/watch"
@@ -76,6 +77,11 @@ func main() {
 	for _, l := range snapshotConfigs.Labels {
 		log.Debug("label: ", l.Label.Key, " ", l.Label.Value)
 	}
+
+	// Init metrics
+	metrics := &metrics.Prometheus{}
+	metrics.Init()
+
 	// Create a snapshotter
 	gsc := snapshot.CreateGCPSnapClient(project, snapPrefix, zones)
 
@@ -83,6 +89,7 @@ func main() {
 	watcher := &watch.Watcher{
 		GSC:           gsc,
 		WatchInterval: watchInterval,
+		Metrics:       metrics,
 	}
 	watcher.Watch(snapshotConfigs)
 

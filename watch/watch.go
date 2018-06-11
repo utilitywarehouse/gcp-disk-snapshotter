@@ -5,6 +5,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/utilitywarehouse/gcp-disk-snapshotter/metrics"
 	"github.com/utilitywarehouse/gcp-disk-snapshotter/models"
 	"github.com/utilitywarehouse/gcp-disk-snapshotter/snapshot"
 	compute "google.golang.org/api/compute/v1"
@@ -16,12 +17,13 @@ const GCPSnapshotTimestampLayout string = "2006-01-02T15:04:05Z07:00"
 type Watcher struct {
 	GSC           snapshot.GCPSnapClientInterface
 	WatchInterval int
+	Metrics       metrics.PrometheusInterface
 }
 
 type WatcherInterface interface {
 	Watch(sc *models.SnapshotConfigs)
 	CheckAndSnapDisks(disks []compute.Disk, retentionStart, lastAcceptedCreation int)
-	deleteSnapshots(sl []compute.Snapshot)
+	deleteSnapshot(s compute.Snapshot)
 	createSnapshot(d compute.Disk)
 	pollZonalOperation(operation, zone string)
 }
@@ -93,32 +95,38 @@ func (w *Watcher) CheckAndSnapDisks(disks []compute.Disk, retentionStart, lastAc
 		}
 
 		// Delete old snaps
-		if err := w.deleteSnapshots(snapsToDelete); err != nil {
-			log.Error(err)
+		for _, s := range snapsToDelete {
+			if err := w.deleteSnapshot(s); err != nil {
+				log.Error("error deleting snapshot: ", err)
+				w.Metrics.UpdateDeleteSnapshotStatus(disk.Name, false)
+			} else {
+				w.Metrics.UpdateDeleteSnapshotStatus(disk.Name, true)
+			}
 		}
 
 		// Take snapshot if needed
 		if snapNeeded {
 			if err := w.createSnapshot(disk); err != nil {
-				log.Error(err)
+				log.Error("error creating snapshot: ", err)
+				w.Metrics.UpdateCreateSnapshotStatus(disk.Name, false)
+			} else {
+				w.Metrics.UpdateCreateSnapshotStatus(disk.Name, true)
 			}
 		}
 
 	}
 }
 
-func (w *Watcher) deleteSnapshots(sl []compute.Snapshot) error {
-	for _, s := range sl {
-		log.Info("Attempting to delete snapshot: ", s.Name)
-		op, err := w.GSC.DeleteSnapshot(s.Name)
-		if err != nil {
-			return err
-		}
-
-		// Delete snapshot is a global operation!!!
-		go w.pollGlobalOperation(op)
-
+func (w *Watcher) deleteSnapshot(s compute.Snapshot) error {
+	log.Info("Attempting to delete snapshot: ", s.Name)
+	op, err := w.GSC.DeleteSnapshot(s.Name)
+	if err != nil {
+		return err
 	}
+
+	// Delete snapshot is a global operation!!!
+	go w.pollGlobalOperation(op)
+
 	return nil
 }
 
@@ -141,10 +149,12 @@ func (w *Watcher) pollZonalOperation(operation, zone string) {
 		status, err := w.GSC.GetZonalOperationStatus(operation, zone)
 		if err != nil {
 			log.Error("Operation failed: ", operation, err)
+			w.Metrics.UpdateOperationStatus("zonal", false)
 			break
 		}
 		if status == "DONE" {
 			log.Info("Operation succeeded: ", operation)
+			w.Metrics.UpdateOperationStatus("zonal", true)
 			break
 		}
 		time.Sleep(1 * time.Second)
@@ -156,10 +166,12 @@ func (w *Watcher) pollGlobalOperation(operation string) {
 		status, err := w.GSC.GetGlobalOperationStatus(operation)
 		if err != nil {
 			log.Error("Operation failed: ", operation, err)
+			w.Metrics.UpdateOperationStatus("global", false)
 			break
 		}
 		if status == "DONE" {
 			log.Info("Operation succeeded: ", operation)
+			w.Metrics.UpdateOperationStatus("global", true)
 			break
 		}
 		time.Sleep(1 * time.Second)
