@@ -36,7 +36,7 @@ func initLogging(logLevel string) {
 
 	level, err := log.ParseLevel(logLevel)
 	if err != nil {
-		log.Fatal("error parsing log level: %v", err)
+		log.Fatalf("error parsing log level: %v", err)
 	}
 	log.SetLevel(level)
 }
