@@ -5,135 +5,152 @@
 package snapshot
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	models "github.com/utilitywarehouse/gcp-disk-snapshotter/models"
-	v1 "google.golang.org/api/compute/v1"
-	reflect "reflect"
+	compute "google.golang.org/api/compute/v1"
 )
 
-// MockGCPSnapClientInterface is a mock of GCPSnapClientInterface interface
+// MockGCPSnapClientInterface is a mock of GCPSnapClientInterface interface.
 type MockGCPSnapClientInterface struct {
 	ctrl     *gomock.Controller
 	recorder *MockGCPSnapClientInterfaceMockRecorder
 }
 
-// MockGCPSnapClientInterfaceMockRecorder is the mock recorder for MockGCPSnapClientInterface
+// MockGCPSnapClientInterfaceMockRecorder is the mock recorder for MockGCPSnapClientInterface.
 type MockGCPSnapClientInterfaceMockRecorder struct {
 	mock *MockGCPSnapClientInterface
 }
 
-// NewMockGCPSnapClientInterface creates a new mock instance
+// NewMockGCPSnapClientInterface creates a new mock instance.
 func NewMockGCPSnapClientInterface(ctrl *gomock.Controller) *MockGCPSnapClientInterface {
 	mock := &MockGCPSnapClientInterface{ctrl: ctrl}
 	mock.recorder = &MockGCPSnapClientInterfaceMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockGCPSnapClientInterface) EXPECT() *MockGCPSnapClientInterfaceMockRecorder {
 	return m.recorder
 }
 
-// GetDisksFromLabel mocks base method
-func (m *MockGCPSnapClientInterface) GetDisksFromLabel(label *models.Label) ([]v1.Disk, error) {
-	ret := m.ctrl.Call(m, "GetDisksFromLabel", label)
-	ret0, _ := ret[0].([]v1.Disk)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDisksFromLabel indicates an expected call of GetDisksFromLabel
-func (mr *MockGCPSnapClientInterfaceMockRecorder) GetDisksFromLabel(label interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDisksFromLabel", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).GetDisksFromLabel), label)
-}
-
-// GetDisksFromDescription mocks base method
-func (m *MockGCPSnapClientInterface) GetDisksFromDescription(label *models.Description) ([]v1.Disk, error) {
-	ret := m.ctrl.Call(m, "GetDisksFromDescription", label)
-	ret0, _ := ret[0].([]v1.Disk)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDisksFromDescription indicates an expected call of GetDisksFromDescription
-func (mr *MockGCPSnapClientInterfaceMockRecorder) GetDisksFromDescription(label interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDisksFromDescription", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).GetDisksFromDescription), label)
-}
-
-// ListSnapshots mocks base method
-func (m *MockGCPSnapClientInterface) ListSnapshots(diskSelfLink string) ([]v1.Snapshot, error) {
-	ret := m.ctrl.Call(m, "ListSnapshots", diskSelfLink)
-	ret0, _ := ret[0].([]v1.Snapshot)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListSnapshots indicates an expected call of ListSnapshots
-func (mr *MockGCPSnapClientInterfaceMockRecorder) ListSnapshots(diskSelfLink interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSnapshots", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).ListSnapshots), diskSelfLink)
-}
-
-// ListClientCreatedSnapshots mocks base method
-func (m *MockGCPSnapClientInterface) ListClientCreatedSnapshots(diskSelfLink string) ([]v1.Snapshot, error) {
-	ret := m.ctrl.Call(m, "ListClientCreatedSnapshots", diskSelfLink)
-	ret0, _ := ret[0].([]v1.Snapshot)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListClientCreatedSnapshots indicates an expected call of ListClientCreatedSnapshots
-func (mr *MockGCPSnapClientInterfaceMockRecorder) ListClientCreatedSnapshots(diskSelfLink interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClientCreatedSnapshots", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).ListClientCreatedSnapshots), diskSelfLink)
-}
-
-// CreateSnapshot mocks base method
+// CreateSnapshot mocks base method.
 func (m *MockGCPSnapClientInterface) CreateSnapshot(diskName, zone string) (string, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateSnapshot", diskName, zone)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// CreateSnapshot indicates an expected call of CreateSnapshot
+// CreateSnapshot indicates an expected call of CreateSnapshot.
 func (mr *MockGCPSnapClientInterfaceMockRecorder) CreateSnapshot(diskName, zone interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSnapshot", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).CreateSnapshot), diskName, zone)
 }
 
-// DeleteSnapshot mocks base method
+// DeleteSnapshot mocks base method.
 func (m *MockGCPSnapClientInterface) DeleteSnapshot(snapName string) (string, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteSnapshot", snapName)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DeleteSnapshot indicates an expected call of DeleteSnapshot
+// DeleteSnapshot indicates an expected call of DeleteSnapshot.
 func (mr *MockGCPSnapClientInterfaceMockRecorder) DeleteSnapshot(snapName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSnapshot", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).DeleteSnapshot), snapName)
 }
 
-// GetZonalOperationStatus mocks base method
-func (m *MockGCPSnapClientInterface) GetZonalOperationStatus(operation, zone string) (string, error) {
-	ret := m.ctrl.Call(m, "GetZonalOperationStatus", operation, zone)
-	ret0, _ := ret[0].(string)
+// GetDisksFromDescription mocks base method.
+func (m *MockGCPSnapClientInterface) GetDisksFromDescription(label *models.Description) ([]compute.Disk, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDisksFromDescription", label)
+	ret0, _ := ret[0].([]compute.Disk)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetZonalOperationStatus indicates an expected call of GetZonalOperationStatus
-func (mr *MockGCPSnapClientInterfaceMockRecorder) GetZonalOperationStatus(operation, zone interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetZonalOperationStatus", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).GetZonalOperationStatus), operation, zone)
+// GetDisksFromDescription indicates an expected call of GetDisksFromDescription.
+func (mr *MockGCPSnapClientInterfaceMockRecorder) GetDisksFromDescription(label interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDisksFromDescription", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).GetDisksFromDescription), label)
 }
 
-// GetGlobalOperationStatus mocks base method
+// GetDisksFromLabel mocks base method.
+func (m *MockGCPSnapClientInterface) GetDisksFromLabel(label *models.Label) ([]compute.Disk, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDisksFromLabel", label)
+	ret0, _ := ret[0].([]compute.Disk)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDisksFromLabel indicates an expected call of GetDisksFromLabel.
+func (mr *MockGCPSnapClientInterfaceMockRecorder) GetDisksFromLabel(label interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDisksFromLabel", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).GetDisksFromLabel), label)
+}
+
+// GetGlobalOperationStatus mocks base method.
 func (m *MockGCPSnapClientInterface) GetGlobalOperationStatus(operation string) (string, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetGlobalOperationStatus", operation)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetGlobalOperationStatus indicates an expected call of GetGlobalOperationStatus
+// GetGlobalOperationStatus indicates an expected call of GetGlobalOperationStatus.
 func (mr *MockGCPSnapClientInterfaceMockRecorder) GetGlobalOperationStatus(operation interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGlobalOperationStatus", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).GetGlobalOperationStatus), operation)
+}
+
+// GetZonalOperationStatus mocks base method.
+func (m *MockGCPSnapClientInterface) GetZonalOperationStatus(operation, zone string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetZonalOperationStatus", operation, zone)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetZonalOperationStatus indicates an expected call of GetZonalOperationStatus.
+func (mr *MockGCPSnapClientInterfaceMockRecorder) GetZonalOperationStatus(operation, zone interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetZonalOperationStatus", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).GetZonalOperationStatus), operation, zone)
+}
+
+// ListClientCreatedSnapshots mocks base method.
+func (m *MockGCPSnapClientInterface) ListClientCreatedSnapshots(diskSelfLink string) ([]*compute.Snapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListClientCreatedSnapshots", diskSelfLink)
+	ret0, _ := ret[0].([]*compute.Snapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListClientCreatedSnapshots indicates an expected call of ListClientCreatedSnapshots.
+func (mr *MockGCPSnapClientInterfaceMockRecorder) ListClientCreatedSnapshots(diskSelfLink interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClientCreatedSnapshots", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).ListClientCreatedSnapshots), diskSelfLink)
+}
+
+// ListSnapshots mocks base method.
+func (m *MockGCPSnapClientInterface) ListSnapshots(diskSelfLink string) ([]*compute.Snapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListSnapshots", diskSelfLink)
+	ret0, _ := ret[0].([]*compute.Snapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListSnapshots indicates an expected call of ListSnapshots.
+func (mr *MockGCPSnapClientInterfaceMockRecorder) ListSnapshots(diskSelfLink interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSnapshots", reflect.TypeOf((*MockGCPSnapClientInterface)(nil).ListSnapshots), diskSelfLink)
 }

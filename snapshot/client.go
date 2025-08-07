@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2/google"
@@ -33,8 +34,8 @@ type GCPSnapClient struct {
 type GCPSnapClientInterface interface {
 	GetDisksFromLabel(label *models.Label) ([]compute.Disk, error)
 	GetDisksFromDescription(label *models.Description) ([]compute.Disk, error)
-	ListSnapshots(diskSelfLink string) ([]compute.Snapshot, error)
-	ListClientCreatedSnapshots(diskSelfLink string) ([]compute.Snapshot, error)
+	ListSnapshots(diskSelfLink string) ([]*compute.Snapshot, error)
+	ListClientCreatedSnapshots(diskSelfLink string) ([]*compute.Snapshot, error)
 	CreateSnapshot(diskName, zone string) (string, error)
 	DeleteSnapshot(snapName string) (string, error)
 	GetZonalOperationStatus(operation, zone string) (string, error)
@@ -43,7 +44,6 @@ type GCPSnapClientInterface interface {
 
 // Basic Init function for the snapshotter
 func CreateGCPSnapClient(project, snapPrefix string, zones []string) *GCPSnapClient {
-
 	ctx := context.Background()
 	googleClient, err := google.DefaultClient(ctx, compute.ComputeScope)
 	if err != nil {
@@ -65,7 +65,6 @@ func CreateGCPSnapClient(project, snapPrefix string, zones []string) *GCPSnapCli
 
 // In case of a gcp link it returns the target (final part after /)
 func formatLinkString(in string) string {
-
 	if strings.ContainsAny(in, "/") {
 		elems := strings.Split(in, "/")
 		return elems[len(elems)-1]
@@ -75,7 +74,6 @@ func formatLinkString(in string) string {
 
 // GetDiskList: Returns a list of disks that contain one of the given labels
 func (gsc *GCPSnapClient) GetDisksFromLabel(label *models.Label) ([]compute.Disk, error) {
-
 	disks := []compute.Disk{}
 
 	for _, zone := range gsc.Zones {
@@ -97,7 +95,6 @@ func (gsc *GCPSnapClient) GetDisksFromLabel(label *models.Label) ([]compute.Disk
 }
 
 func (gsc *GCPSnapClient) GetDisksFromDescription(desc *models.Description) ([]compute.Disk, error) {
-
 	disks := []compute.Disk{}
 
 	for _, zone := range gsc.Zones {
@@ -124,42 +121,47 @@ func (gsc *GCPSnapClient) GetDisksFromDescription(desc *models.Description) ([]c
 }
 
 // ListSnapshots: Lists Snapshots for a given disk
-func (gsc *GCPSnapClient) ListSnapshots(diskSelfLink string) ([]compute.Snapshot, error) {
+func (gsc *GCPSnapClient) ListSnapshots(diskSelfLink string) ([]*compute.Snapshot, error) {
+	var snapshots []*compute.Snapshot
 
-	snapshots := []compute.Snapshot{}
+	req := gsc.ComputeService.Snapshots.List(gsc.Project)
 
-	resp, err := gsc.ComputeService.Snapshots.List(gsc.Project).Do()
-	if err != nil {
-		return snapshots, errors.Wrap(err, "error requesting snapshots list:")
-	}
-	for _, snap := range resp.Items {
-		// If not created by the snapshotter just ignore
-		if val, ok := snap.Labels[SnapshotterLabel]; ok {
-			if val != SnapshotterLabelValue {
+	err := req.Pages(context.Background(), func(page *compute.SnapshotList) error {
+		for _, snap := range page.Items {
+			// If not created by the snapshotter just ignore
+			if val, ok := snap.Labels[SnapshotterLabel]; ok {
+				if val != SnapshotterLabelValue {
+					continue
+				}
+			} else {
 				continue
 			}
-		} else {
-			continue
-		}
 
-		// If it's a snapshot of the input disk add to the list
-		if snap.SourceDisk == diskSelfLink {
-			snapshots = append(snapshots, *snap)
+			// Skip if snapshot is not from the requested disk
+			if snap.SourceDisk != diskSelfLink {
+				continue
+			}
+
+			snapshots = append(snapshots, snap)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error requesting snapshots list:")
 	}
+
 	return snapshots, nil
 }
 
-// ListClientCreatedSnapshots: Lists snapshots for a given disk that were create by the client,
+// ListClientCreatedSnapshots: Lists snapshots for a given disk that were created by the client,
 // meaning that they have the SnapshotterLabel
-func (gsc *GCPSnapClient) ListClientCreatedSnapshots(diskSelfLink string) ([]compute.Snapshot, error) {
-
+func (gsc *GCPSnapClient) ListClientCreatedSnapshots(diskSelfLink string) ([]*compute.Snapshot, error) {
 	snaps, err := gsc.ListSnapshots(diskSelfLink)
 	if err != nil {
-		return []compute.Snapshot{}, err
+		return nil, err
 	}
 
-	res := []compute.Snapshot{}
+	res := []*compute.Snapshot{}
 	for _, snap := range snaps {
 		if val, ok := snap.Labels[SnapshotterLabel]; ok {
 			if SnapshotterLabelValue == val {
@@ -175,7 +177,6 @@ func (gsc *GCPSnapClient) ListClientCreatedSnapshots(diskSelfLink string) ([]com
 // CreateSnapshot: Gets a disk name and a zone, issues a create snapshot command to api
 // and returns a link to the create snapshot operation
 func (gsc *GCPSnapClient) CreateSnapshot(diskName, zone string) (string, error) {
-
 	// format zone if link
 	zn := formatLinkString(zone)
 
@@ -205,7 +206,6 @@ func (gsc *GCPSnapClient) CreateSnapshot(diskName, zone string) (string, error) 
 
 // DeleteSnapshot: Gets a snapshot name and issues a delete. Returns a link to the delete operation
 func (gsc *GCPSnapClient) DeleteSnapshot(snapName string) (string, error) {
-
 	resp, err := gsc.ComputeService.Snapshots.Delete(gsc.Project, snapName).Do()
 	if err != nil {
 		return "", errors.Wrap(err, "error deleting snapshot:")
@@ -215,7 +215,6 @@ func (gsc *GCPSnapClient) DeleteSnapshot(snapName string) (string, error) {
 }
 
 func parseOperationOut(operation *compute.Operation) (string, error) {
-
 	// Get status (Possible values: "DONE", "PENDING", "RUNNING") and errors
 	status := operation.Status
 	if operation.Error != nil {
@@ -226,11 +225,9 @@ func parseOperationOut(operation *compute.Operation) (string, error) {
 		return status, errors.New(strings.Join(err_msgs, ","))
 	}
 	return status, nil
-
 }
 
 func (gsc *GCPSnapClient) GetZonalOperationStatus(operation, zone string) (string, error) {
-
 	// Format in case of link
 	operation = formatLinkString(operation)
 	zone = formatLinkString(zone)
@@ -244,7 +241,6 @@ func (gsc *GCPSnapClient) GetZonalOperationStatus(operation, zone string) (strin
 }
 
 func (gsc *GCPSnapClient) GetGlobalOperationStatus(operation string) (string, error) {
-
 	// Format in case of link
 	operation = formatLinkString(operation)
 

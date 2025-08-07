@@ -29,7 +29,6 @@ type WatcherInterface interface {
 }
 
 func (w *Watcher) Watch(sc *models.SnapshotConfigs) {
-
 	for t := time.Tick(time.Second * time.Duration(w.WatchInterval)); ; <-t {
 
 		// Check Labels
@@ -85,7 +84,7 @@ func (w *Watcher) CheckAndSnapDisks(disks []compute.Disk, retentionStart, lastAc
 
 			// If created before retention start time we need to delete
 			if snapTime.Before(retentionStart) {
-				snapsToDelete = append(snapsToDelete, snap)
+				snapsToDelete = append(snapsToDelete, *snap)
 			}
 
 			// If a snap was taken after last accepted creation time we do not need a new one
