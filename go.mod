@@ -11,7 +11,7 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/utilitywarehouse/go-operational v0.0.0-20190722153447-b0f3f6284543
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/sys v0.0.0-20200722175500-76b94024e4b6 // indirect
+	golang.org/x/sys v0.1.0 // indirect
 	google.golang.org/api v0.29.0
 	google.golang.org/genproto v0.0.0-20200724131911-43cab4749ae7 // indirect
 )
