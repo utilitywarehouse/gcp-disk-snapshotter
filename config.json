@@ -1,0 +1,12 @@
+{
+  "Labels": [
+    {
+      "retentionPeriodHours": 720,
+      "intervalSeconds": 43200,
+      "label": {
+        "key": "name",
+        "value": "etcd-k8s-exp-1-data-vol-2"
+      }
+    }
+  ]
+}
