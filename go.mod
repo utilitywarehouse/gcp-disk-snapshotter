@@ -1,6 +1,6 @@
 module github.com/utilitywarehouse/gcp-disk-snapshotter
 
-go 1.26.5
+go 1.26.10
 
 require (
 	github.com/golang/mock v1.4.3
